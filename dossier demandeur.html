@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head> 
+<style>
+
+body {
+  background-color: lightblue;
+
+ 
+}
+
+
+.intro {
+  background-color: rgb(0, 110, 255);
+}
+</style>
+	<title>Demandeur</title>
+</head>
+<body>
+	
+	
+	<form> 
+		<div class="intro"><label >الحالة العائلية</label> </div> <br>
+        <input type="radio" id="cilib" name="stuation_f" value="cilib">
+        <label for="cilib">أعزب\عزباء </label><br>
+
+        <input type="radio" id="marie" name="stuation_f" value="marie">
+        <label for="marie">متزوج\ة</label><br>
+
+        <input type="radio" id="divor" name="stuation_f" value="divor">
+        <label for="divor">مطلق\ة</label><br>
+
+        <input type="radio" id="veuf" name="stuation_f" value="veuf">
+        <label for="veuf">أرمل\ة</label><br>
+
+
+		<label for="nom_c"> لقب الزوجة:</label>
+		<input type="text" id="nom_c_ar" name="nom_c_ar" value="">
+		<input type="text" id="nom_c" name="nom_c" placeholder="اللقب باللاتينية"><br>
+        
+        <label for="prenom_c">اسم الزوجة:</label>
+        <input type="text" id="prenom_c_ar" name="prenom_c_ar" value=""> 
+        <input type="text" id="prenom_c" name="prenom_c" placeholder="الاسم باللاتينية"><br>
+
+        
+        		
+		<label for="act_n_c"> رقم عقد الميلاد للزوجة</label>
+		<input type="text" name="act_n_c"><br>
+		
+		<label for="date_n_c"> تاريخ ميلاد الزوجة : </label>
+		<input type="date" id="date_n_c" name="date_n_c"><br>
+
+		<label for="lieu_n_c">مكان ميلاد الزوجة:</label>
+		
+
+		<label for="wil_n_c"> ولاية الميلاد للزوجة:</label>
+		<select id="wil_n_c"  name="wil_n_c">
+			<option  value="" disabled selected hidden> اختر ولاية الميلاد</option>
+		    <option value="wil_n_c"></option>
+		</select><br>
+
+		<label for="com_n_c">بلدية الميلاد للزوجة:</label>
+		<select id="com_n_c" name="com_n_c">
+			<option  value="" disabled selected hidden>اختر بلدية الميلاد</option>
+		    <option value="com_n_c"></option>
+		</select><br>
+
+		<label for="prenom_p_c">  اسم الاب للزوجة:</label>
+        <input type="text" id="prenom_p_c_ar" name="prenom_p_c_ar" value=""> 
+        <input type="text" id="prenom_p_c" name="prenom_p_c" placeholder="اسم الاب باللاتينية"><br>
+
+		<label for="nom_m_c">لقب الأم للزوجة:</label>
+		<input type="text" id="nom_m_c_ar" name="nom_m_c_ar" value="">
+		<input type="text" id="nom_m_c" name="nom_m_c" placeholder="لقب الأم باللاتينية"><br>
+        _
+        <label for="prenom_m_c"> اسم الأم للزوجة:</label>
+        <input type="text" id="prenom_m_c_ar" name="prenom_m_c_ar" value=""> 
+        <input type="text" id="prenom_m_c" name="prenom_m_c" placeholder="اسم الأم باللاتينية"><br>
+
+		<input type="submit" value="حفظ">  
+		<input type="reset" value="إلغاء"><br>
+
+
+		<label for="date_depo"> تاريخ الإيداع : </label>
+		<input type="date" id="date_depo" name="date_depo"><br>
+
+		<label for="date_depo"> رقم الملف : </label>
+		<input type="date" id="date_depo" name="date_depo"><br>
+
+		<div class="intro">	<label >الحالة الشخصية</label></div><br>
+
+	</form>
+</body>
+</html>
