@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>محوّل ملفات إكسل</title>
+<script src="lib/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #eef4fb; --card: #ffffff; --text: #1d2733; --muted: #5b6b7c;
+    --border: #d4dde8; --accent: #0a6ad6; --accent-text: #ffffff;
+    --ok: #1d7f45; --warn: #b4541a; --row-alt: #f6f9fc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121820; --card: #1b232d; --text: #e4ebf2; --muted: #9aabbd;
+      --border: #2e3a48; --accent: #4f9cf0; --accent-text: #0b1118;
+      --ok: #5cc98a; --warn: #f0a46a; --row-alt: #202a35;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif; font-size: 15px; line-height: 1.5;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  section {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  h2 .n {
+    display: inline-block; width: 1.6em; height: 1.6em; line-height: 1.6em; text-align: center;
+    border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: .9em; margin-left: 6px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+  label { color: var(--muted); }
+  input[type=text], input[type=number], select {
+    font: inherit; color: var(--text); background: var(--card);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; min-width: 0;
+  }
+  input[type=number] { width: 70px; }
+  button, .filebtn {
+    font: inherit; cursor: pointer; border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 12px; background: var(--card); color: var(--text);
+  }
+  button.primary, .filebtn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .filebtn input { display: none; }
+  .hint { color: var(--muted); font-size: .9em; }
+  .status { font-size: .95em; }
+  .status.ok { color: var(--ok); } .status.warn { color: var(--warn); }
+  #map { width: 100%; border-collapse: collapse; }
+  #map th, #map td { border-bottom: 1px solid var(--border); padding: 6px 4px; text-align: right; vertical-align: middle; }
+  #map th { color: var(--muted); font-weight: 600; font-size: .9em; }
+  #map input[type=text], #map select { width: 100%; }
+  #map td.act { white-space: nowrap; }
+  #map td.act button { padding: 4px 8px; }
+  #map tr.unmapped input.tpl { border-color: var(--warn); }
+  .scroll { overflow-x: auto; max-width: 100%; }
+  #preview { border-collapse: collapse; font-size: .9em; }
+  #preview th, #preview td { border: 1px solid var(--border); padding: 4px 8px; white-space: nowrap; }
+  #preview th { background: var(--row-alt); }
+  #preview tr:nth-child(even) td { background: var(--row-alt); }
+  code { background: var(--row-alt); padding: 1px 4px; border-radius: 4px; direction: ltr; unicode-bidi: embed; }
+  @media (max-width: 700px) {
+    #map thead { display: none; }
+    #map tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    #map td { border: 0; padding: 0; }
+    #map td.tplcell, #map td.act { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>محوّل ملفات إكسل</h1>
+  <p class="sub">استيراد ملف إكسل (بالفرنسية) وإعادة ترتيب معلوماته وتصديرها في ملف إكسل جديد بالشكل المطلوب. كل المعالجة تتم داخل المتصفح ولا يُرسل أي ملف إلى الإنترنت.</p>
+
+  <section>
+    <h2><span class="n">1</span>ملف الإدخال</h2>
+    <div class="row">
+      <label class="filebtn primary">اختر ملف الإكسل…<input type="file" id="inFile" accept=".xlsx,.xls,.xlsm,.ods,.csv"></label>
+      <span id="inStatus" class="status hint">لم يتم اختيار ملف بعد</span>
+    </div>
+    <div class="row">
+      <label for="sheetSel">الورقة:</label>
+      <select id="sheetSel" disabled></select>
+      <label for="hdrRow">رقم سطر العناوين:</label>
+      <input type="number" id="hdrRow" min="1" value="1">
+      <span class="hint">(يُكتشف تلقائياً، ويمكن تغييره)</span>
+    </div>
+    <div class="hint" id="inCols"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>شكل ملف الإخراج (ترتيب الأعمدة)</h2>
+    <p class="hint" style="margin-top:0">
+      كل سطر هنا = عمود في الملف الناتج، بنفس الترتيب. اختر لكل عمود العمود المقابل له من ملف الإدخال.
+      يمكن أيضاً دمج عدة أعمدة في خانة "الصيغة"، مثلاً <code>{Nom} {Prénom}</code>،
+      و<code>{#}</code> يعطي الرقم التسلسلي.
+    </p>
+    <div class="row">
+      <button id="autoBtn">مطابقة تلقائية</button>
+      <button id="addBtn">+ إضافة عمود</button>
+      <label class="filebtn">تحميل الشكل من ملف إكسل نموذجي…<input type="file" id="modelFile" accept=".xlsx,.xls,.xlsm,.ods"></label>
+      <button id="saveBtn">حفظ الإعدادات (JSON)</button>
+      <label class="filebtn">فتح إعدادات محفوظة…<input type="file" id="loadCfg" accept=".json"></label>
+      <button id="resetBtn">الشكل الافتراضي</button>
+    </div>
+    <div class="scroll">
+      <table id="map">
+        <thead><tr><th style="width:24%">عنوان العمود في الملف الناتج</th><th style="width:26%">العمود من ملف الإدخال</th><th>الصيغة</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>المعاينة والتصدير</h2>
+    <div class="row">
+      <label for="outName">اسم الملف الناتج:</label>
+      <input type="text" id="outName" value="resultat" style="width:200px">
+      <label><input type="checkbox" id="rtl" checked> ورقة من اليمين لليسار</label>
+      <label for="dateFmt">شكل التاريخ:</label>
+      <select id="dateFmt">
+        <option value="dd/mm/yyyy">31/12/1990</option>
+        <option value="yyyy-mm-dd">1990-12-31</option>
+        <option value="date">تاريخ إكسل حقيقي</option>
+      </select>
+      <button id="exportBtn" class="primary" disabled>تصدير ملف الإكسل</button>
+    </div>
+    <div id="outStatus" class="status hint"></div>
+    <div class="scroll"><table id="preview"></table></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+// Default output layout. `keys` are normalised French (or Arabic) header names used for auto-matching.
+const DEFAULT_COLUMNS = [
+  { title: "الرقم", tpl: "{#}" },
+  { title: "اللقب", keys: ["nom", "nom demandeur", "nom du demandeur", "nom de famille", "اللقب"] },
+  { title: "الاسم", keys: ["prenom", "prenom demandeur", "prenom du demandeur", "الاسم"] },
+  { title: "الجنس", keys: ["sexe", "genre", "الجنس"] },
+  { title: "تاريخ الميلاد", keys: ["date de naissance", "date naissance", "date naiss", "ne le", "nee le", "ddn", "تاريخ الميلاد"] },
+  { title: "مكان الميلاد", keys: ["lieu de naissance", "lieu naissance", "lieu naiss", "ne a", "commune de naissance", "مكان الميلاد"] },
+  { title: "رقم عقد الميلاد", keys: ["numero acte de naissance", "n acte de naissance", "num acte", "n acte", "acte de naissance", "رقم عقد الميلاد"] },
+  { title: "اسم الأب", keys: ["prenom du pere", "prenom pere", "pere", "fils de", "fille de", "اسم الاب"] },
+  { title: "لقب الأم", keys: ["nom de la mere", "nom mere", "nom de mere", "لقب الام"] },
+  { title: "اسم الأم", keys: ["prenom de la mere", "prenom mere", "mere", "اسم الام"] },
+  { title: "الحالة العائلية", keys: ["situation familiale", "etat civil", "situation", "الحالة العائلية"] },
+  { title: "عدد الأولاد", keys: ["nombre d enfants", "nombre enfants", "nb enfants", "nbre enfants", "enfants", "عدد الاولاد"] },
+  { title: "لقب الزوج(ة)", keys: ["nom du conjoint", "nom conjoint", "nom de l epoux", "nom de l epouse", "nom epoux", "nom epouse", "لقب الزوج"] },
+  { title: "اسم الزوج(ة)", keys: ["prenom du conjoint", "prenom conjoint", "prenom de l epoux", "prenom de l epouse", "prenom epoux", "prenom epouse", "اسم الزوج"] },
+  { title: "تاريخ ميلاد الزوج(ة)", keys: ["date de naissance du conjoint", "date de naissance conjoint", "date naissance conjoint", "date naiss conjoint", "date de naissance epoux", "date de naissance epouse", "تاريخ ميلاد الزوج"] },
+  { title: "مكان ميلاد الزوج(ة)", keys: ["lieu de naissance du conjoint", "lieu de naissance conjoint", "lieu naissance conjoint", "lieu de naissance epoux", "lieu de naissance epouse", "مكان ميلاد الزوج"] },
+  { title: "اسم أب الزوج(ة)", keys: ["prenom du pere du conjoint", "pere du conjoint", "pere conjoint", "اسم اب الزوج"] },
+  { title: "لقب أم الزوج(ة)", keys: ["nom de la mere du conjoint", "nom mere conjoint", "لقب ام الزوج"] },
+  { title: "اسم أم الزوج(ة)", keys: ["prenom de la mere du conjoint", "mere du conjoint", "mere conjoint", "اسم ام الزوج"] },
+  { title: "العنوان", keys: ["adresse", "adresse actuelle", "domicile", "العنوان"] },
+];
+const STORE_KEY = "convertisseur-excel-config-v1";
+
+const $ = (id) => document.getElementById(id);
+let workbook = null;   // input workbook
+let headers = [];      // input headers (strings, unique)
+let rows = [];         // input data rows as arrays aligned with headers
+let columns = [];      // output columns: {title, tpl, keys?}
+
+// --- helpers -------------------------------------------------------------
+function norm(s) {
+  return String(s ?? "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")       // strip French accents
+    .replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي")
+    .toLowerCase()
+    .replace(/[°º'’`".:()\[\]\/\\_\-–,;]+/g, " ")
+    .replace(/\bn\s*o\b/g, "n")
+    .replace(/\s+/g, " ").trim();
+}
+function pad(n) { return String(n).padStart(2, "0"); }
+// d is a Date or an SSF date code {y, m, d}.
+function fmtDate(d, fmt) {
+  const y = d instanceof Date ? d.getFullYear() : d.y;
+  const m = d instanceof Date ? d.getMonth() + 1 : d.m;
+  const day = d instanceof Date ? d.getDate() : d.d;
+  if (fmt === "yyyy-mm-dd") return `${y}-${pad(m)}-${pad(day)}`;
+  return `${pad(day)}/${pad(m)}/${y}`;
+}
+function excelSerial(d) { return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5 + 25569; }
+function cellText(v, fmt) {
+  if (v == null) return "";
+  if (v.t === "n" && v.z) return fmtDate(XLSX.SSF.parse_date_code(v.v), fmt);
+  if (v instanceof Date) return fmtDate(v, fmt);
+  return String(v).trim();
+}
+function escHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function download(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function setStatus(el, msg, kind) { el.textContent = msg; el.className = "status " + (kind || "hint"); }
+
+// --- input ---------------------------------------------------------------
+function detectHeaderRow(aoa) {
+  for (let i = 0; i < Math.min(aoa.length, 30); i++) {
+    const filled = (aoa[i] || []).filter((c) => c != null && String(c).trim() !== "").length;
+    if (filled >= 2) return i + 1;
+  }
+  return 1;
+}
+
+// Reads a sheet as an array of rows (index = Excel row - 1). Date cells become
+// local-midnight Date objects built from the calendar day, so the day never
+// shifts with the computer's time zone.
+function sheetRows(ws) {
+  if (!ws || !ws["!ref"]) return [];
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  const aoa = [];
+  for (let r = 0; r <= range.e.r; r++) {
+    const row = [];
+    for (let c = 0; c <= range.e.c; c++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c })];
+      let v = cell ? cell.v : null;
+      if (cell && cell.t === "n" && cell.z && XLSX.SSF.is_date(cell.z)) {
+        const p = XLSX.SSF.parse_date_code(v);
+        v = new Date(p.y, p.m - 1, p.d);
+      } else if (cell && cell.t === "d") {
+        v = new Date(v.getFullYear(), v.getMonth(), v.getDate());
+      }
+      row.push(v);
+    }
+    aoa.push(row);
+  }
+  return aoa;
+}
+
+function loadSheet(autoHeader) {
+  const aoa = sheetRows(workbook.Sheets[$("sheetSel").value]);
+  if (autoHeader) $("hdrRow").value = detectHeaderRow(aoa);
+  const h = Math.max(1, parseInt($("hdrRow").value, 10) || 1) - 1;
+  const rawHdr = aoa[h] || [];
+  const seen = {};
+  const width = Math.max(rawHdr.length, ...aoa.slice(h + 1).map((r) => r.length), 0);
+  headers = [];
+  for (let c = 0; c < width; c++) {
+    let name = rawHdr[c] == null || String(rawHdr[c]).trim() === "" ? `Colonne ${XLSX.utils.encode_col(c)}` : String(rawHdr[c]).replace(/\s+/g, " ").trim();
+    if (seen[name]) name = `${name} (${++seen[name]})`; else seen[name] = 1;
+    headers.push(name);
+  }
+  rows = aoa.slice(h + 1).filter((r) => r.some((c) => c != null && String(c).trim() !== ""));
+  $("inCols").innerHTML = headers.length
+    ? `<b>${rows.length}</b> سطر بيانات · الأعمدة الموجودة: ` + headers.map((x) => `<code>${escHtml(x)}</code>`).join(" ")
+    : "";
+  renderMap();
+  renderPreview();
+}
+
+$("inFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    workbook = XLSX.read(await f.arrayBuffer(), { cellNF: true });
+    const sel = $("sheetSel");
+    sel.innerHTML = workbook.SheetNames.map((n) => `<option>${escHtml(n)}</option>`).join("");
+    sel.disabled = false;
+    $("outName").value = f.name.replace(/\.[^.]+$/, "") + "_resultat";
+    setStatus($("inStatus"), `تم فتح: ${f.name}`, "ok");
+    loadSheet(true);
+    if (columns.every((c) => !c.tpl || c.tpl === "{#}")) autoMatch();
+  } catch (err) {
+    setStatus($("inStatus"), "تعذّر قراءة الملف: " + err.message, "warn");
+  }
+});
+$("sheetSel").addEventListener("change", () => loadSheet(true));
+$("hdrRow").addEventListener("change", () => loadSheet(false));
+
+// --- mapping -------------------------------------------------------------
+function bestHeaderFor(col) {
+  const keys = (col.keys && col.keys.length ? col.keys : []).concat([col.title]).map(norm).filter(Boolean);
+  let best = null, bestScore = 0;
+  headers.forEach((h) => {
+    const nh = norm(h);
+    if (!nh) return;
+    for (const k of keys) {
+      let score = 0;
+      if (nh === k) score = 2;
+      else if ((" " + nh + " ").includes(" " + k + " ")) score = k.length / nh.length;
+      if (score > bestScore) { bestScore = score; best = h; }
+    }
+  });
+  return bestScore >= 0.5 ? best : null;
+}
+
+function autoMatch() {
+  if (!headers.length) { setStatus($("outStatus"), "اختر ملف الإدخال أولاً.", "warn"); return; }
+  let n = 0;
+  columns.forEach((c) => {
+    if (c.tpl === "{#}") return;
+    const h = bestHeaderFor(c);
+    if (h) { c.tpl = `{${h}}`; n++; }
+  });
+  saveLocal();
+  renderMap();
+  renderPreview();
+  setStatus($("outStatus"), `تمت مطابقة ${n} عمود تلقائياً. راجع الأعمدة الملوّنة وأكملها يدوياً.`, "ok");
+}
+
+function renderMap() {
+  const tb = $("map").querySelector("tbody");
+  const opts = `<option value="">— فارغ —</option><option value="{#}">الرقم التسلسلي</option>` +
+    headers.map((h) => `<option value="${escHtml("{" + h + "}")}">${escHtml(h)}</option>`).join("");
+  tb.innerHTML = columns.map((c, i) => `
+    <tr data-i="${i}" class="${c.tpl ? "" : "unmapped"}">
+      <td><input type="text" class="title" value="${escHtml(c.title)}" aria-label="عنوان العمود"></td>
+      <td><select class="src" aria-label="العمود المصدر">${opts}</select></td>
+      <td class="tplcell"><input type="text" class="tpl" dir="ltr" value="${escHtml(c.tpl || "")}" placeholder="{Nom} {Prénom}" aria-label="الصيغة"></td>
+      <td class="act">
+        <button class="up" title="أعلى">▲</button><button class="down" title="أسفل">▼</button><button class="del" title="حذف">✕</button>
+      </td>
+    </tr>`).join("");
+  tb.querySelectorAll("tr").forEach((tr) => {
+    const c = columns[+tr.dataset.i];
+    const sel = tr.querySelector(".src");
+    sel.value = [...sel.options].some((o) => o.value === c.tpl) ? c.tpl : "";
+  });
+}
+
+$("map").addEventListener("input", (e) => {
+  const tr = e.target.closest("tr"); if (!tr) return;
+  const c = columns[+tr.dataset.i];
+  if (e.target.classList.contains("title")) c.title = e.target.value;
+  if (e.target.classList.contains("tpl")) {
+    c.tpl = e.target.value;
+    const sel = tr.querySelector(".src");
+    sel.value = [...sel.options].some((o) => o.value === c.tpl) ? c.tpl : "";
+    tr.classList.toggle("unmapped", !c.tpl);
+  }
+  saveLocal(); renderPreview();
+});
+$("map").addEventListener("change", (e) => {
+  if (!e.target.classList.contains("src")) return;
+  const tr = e.target.closest("tr");
+  const c = columns[+tr.dataset.i];
+  c.tpl = e.target.value;
+  tr.querySelector(".tpl").value = c.tpl;
+  tr.classList.toggle("unmapped", !c.tpl);
+  saveLocal(); renderPreview();
+});
+$("map").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr"); if (!tr || e.target.tagName !== "BUTTON") return;
+  const i = +tr.dataset.i;
+  if (e.target.classList.contains("del")) columns.splice(i, 1);
+  if (e.target.classList.contains("up") && i > 0) [columns[i - 1], columns[i]] = [columns[i], columns[i - 1]];
+  if (e.target.classList.contains("down") && i < columns.length - 1) [columns[i + 1], columns[i]] = [columns[i], columns[i + 1]];
+  saveLocal(); renderMap(); renderPreview();
+});
+$("addBtn").addEventListener("click", () => { columns.push({ title: "عمود جديد", tpl: "" }); saveLocal(); renderMap(); });
+$("autoBtn").addEventListener("click", autoMatch);
+$("resetBtn").addEventListener("click", () => {
+  if (!confirm("استرجاع الشكل الافتراضي؟ ستضيع التعديلات الحالية.")) return;
+  columns = structuredClone(DEFAULT_COLUMNS).map((c) => ({ ...c, tpl: c.tpl || "" }));
+  if (headers.length) autoMatch(); else { saveLocal(); renderMap(); }
+});
+
+// Output layout taken from the header row of a model workbook.
+$("modelFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const wb = XLSX.read(await f.arrayBuffer(), { cellNF: true });
+    const aoa = sheetRows(wb.Sheets[wb.SheetNames[0]]);
+    const hdr = (aoa[detectHeaderRow(aoa) - 1] || []).map((x) => (x == null ? "" : String(x).trim())).filter(Boolean);
+    if (!hdr.length) throw new Error("لم يتم العثور على عناوين");
+    // Re-use the synonyms of a default column with the same title, so auto-matching still works.
+    columns = hdr.map((t) => {
+      const d = DEFAULT_COLUMNS.find((x) => norm(x.title) === norm(t));
+      return { title: t, keys: d ? d.keys : undefined, tpl: d && d.tpl ? d.tpl : "" };
+    });
+    if (headers.length) autoMatch(); else { saveLocal(); renderMap(); }
+    setStatus($("outStatus"), `تم أخذ ${hdr.length} عمود من النموذج "${f.name}".`, "ok");
+  } catch (err) {
+    setStatus($("outStatus"), "تعذّر قراءة النموذج: " + err.message, "warn");
+  }
+  e.target.value = "";
+});
+
+// --- config persistence ------------------------------------------------------
+function saveLocal() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(columns)); } catch (_) {}
+}
+function loadLocal() {
+  try {
+    const v = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if (Array.isArray(v) && v.length) return v;
+  } catch (_) {}
+  return null;
+}
+$("saveBtn").addEventListener("click", () => {
+  download(new Blob([JSON.stringify(columns, null, 2)], { type: "application/json" }), "config_conversion.json");
+});
+$("loadCfg").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const v = JSON.parse(await f.text());
+    if (!Array.isArray(v)) throw new Error("صيغة غير صحيحة");
+    columns = v.map((c) => ({ title: String(c.title ?? ""), tpl: String(c.tpl ?? ""), keys: c.keys }));
+    saveLocal(); renderMap(); renderPreview();
+    setStatus($("outStatus"), "تم تحميل الإعدادات.", "ok");
+  } catch (err) { setStatus($("outStatus"), "تعذّر فتح الإعدادات: " + err.message, "warn"); }
+  e.target.value = "";
+});
+
+// --- transform & export ------------------------------------------------------
+const TOKEN = /\{([^{}]+)\}/g;
+
+// Returns the value of one output cell. A template that is exactly one
+// placeholder keeps the original value type (date / number).
+function evalCell(tpl, row, idx, fmt) {
+  if (!tpl) return "";
+  const whole = tpl.match(/^\{([^{}]+)\}$/);
+  const get = (name) => {
+    if (name === "#") return idx + 1;
+    const c = headers.indexOf(name);
+    return c < 0 ? null : row[c];
+  };
+  if (whole) {
+    const v = get(whole[1]);
+    if (v instanceof Date && fmt === "date") return { t: "n", z: "dd/mm/yyyy", v: excelSerial(v) };
+    if (typeof v === "number") return v;
+    return cellText(v, fmt);
+  }
+  return tpl.replace(TOKEN, (_, name) => cellText(get(name), fmt)).replace(/\s+/g, " ").trim();
+}
+
+function buildOutput() {
+  const fmt = $("dateFmt").value;
+  const out = [columns.map((c) => c.title)];
+  rows.forEach((r, i) => out.push(columns.map((c) => evalCell(c.tpl, r, i, fmt))));
+  return out;
+}
+
+function renderPreview() {
+  const tbl = $("preview");
+  $("exportBtn").disabled = !rows.length || !columns.length;
+  if (!rows.length) { tbl.innerHTML = ""; return; }
+  const out = buildOutput();
+  const fmt = $("dateFmt").value;
+  const shown = out.slice(0, 11);
+  tbl.innerHTML = "<tr>" + shown[0].map((h) => `<th>${escHtml(h)}</th>`).join("") + "</tr>" +
+    shown.slice(1).map((r) => "<tr>" + r.map((v) => `<td>${escHtml(cellText(v, fmt === "date" ? "dd/mm/yyyy" : fmt))}</td>`).join("") + "</tr>").join("");
+  const missing = columns.filter((c) => !c.tpl).length;
+  setStatus($("outStatus"),
+    `معاينة أول ${Math.min(10, rows.length)} من ${rows.length} سطر.` + (missing ? ` تنبيه: ${missing} عمود بدون مصدر وسيبقى فارغاً.` : ""),
+    missing ? "warn" : "ok");
+}
+$("dateFmt").addEventListener("change", renderPreview);
+
+$("exportBtn").addEventListener("click", () => {
+  const out = buildOutput();
+  const ws = XLSX.utils.aoa_to_sheet(out);
+  ws["!cols"] = out[0].map((_, c) => ({
+    wch: Math.min(40, Math.max(8, ...out.slice(0, 200).map((r) => cellText(r[c], "dd/mm/yyyy").length + 2))),
+  }));
+  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: out.length - 1, c: out[0].length - 1 } }) };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "البيانات");
+  if ($("rtl").checked) wb.Workbook = { Views: [{ RTL: true }] };
+  const name = ($("outName").value.trim() || "resultat").replace(/[\\/:*?"<>|]/g, "_");
+  const data = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  download(new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), name + ".xlsx");
+});
+
+// --- init ---------------------------------------------------------------
+columns = loadLocal() || structuredClone(DEFAULT_COLUMNS).map((c) => ({ ...c, tpl: c.tpl || "" }));
+renderMap();
+</script>
+</body>
+</html>
